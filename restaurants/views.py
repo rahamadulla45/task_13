@@ -1,19 +1,35 @@
 from django.shortcuts import render, redirect
-from .models import Restaurant, Item
+from .models import Restaurant, Item,FavoriteRestaurant
 from .forms import RestaurantForm, ItemForm, SignupForm, SigninForm
 from django.contrib.auth import login, authenticate, logout
 from django.db.models import Q
+from django.http import JsonResponse
 
 # This view will be used to favorite a restaurant
 def restaurant_favorite(request, restaurant_id):
-    
-    return
+    restaurant = Restaurant.objects.get(id=restaurant_id)
+    fav_obj, created = FavoriteRestaurant.objects.get_or_create(restaurant=restaurant, user=request.user)
+    if created:
+        action= "fav"
+    else:
+        action = "unfav"
+        fav_obj.delete()
+     
+    response = {
+      "action": action
+    }
+    return JsonResponse(response)
 
 
 # This view will be used to display only restaurants a user has favorited
 def favorite_restaurants(request):
-    
-    return
+    if request.user.is_anonymous:
+        return redirect('signin')
+    fav_restaurants = FavoriteRestaurant.objects.filter(user=request.user)
+    context = {
+        "favs": fav_restaurants,
+    }
+    return render(request,'favs.html',context)
 
 
 def no_access(request):
@@ -59,21 +75,23 @@ def signout(request):
     return redirect("signin")
 
 def restaurant_list(request):
+    if request.user.is_anonymous:
+        return redirect('signin')
     restaurants = Restaurant.objects.all()
+
     query = request.GET.get('q')
     if query:
-        # Not Bonus. Querying through a single field.
-        # restaurants = restaurants.filter(name__icontains=query)
-        
-        # Bonus. Querying through multiple fields.
+       
         restaurants = restaurants.filter(
             Q(name__icontains=query)|
             Q(description__icontains=query)|
             Q(owner__username__icontains=query)
         ).distinct()
-        #############
+    favs = FavoriteRestaurant.objects.filter(user=request.user)
+    fav_restaurants = [fav.restaurant for fav in favs]
     context = {
-       "restaurants": restaurants
+       "restaurants": restaurants,
+       "fav_restaurants":fav_restaurants,
     }
     return render(request, 'list.html', context)
 
